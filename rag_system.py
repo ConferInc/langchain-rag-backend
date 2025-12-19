@@ -1,6 +1,6 @@
-"""RAG System using LangChain with Qdrant (requests-based for Windows compatibility)"""
+"""RAG System using LangChain with Qdrant"""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -12,16 +12,26 @@ import os
 
 load_dotenv()
 
+# Get API keys
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+# Validate environment variables
+if not OPENAI_API_KEY:
+    print("WARNING: OPENAI_API_KEY not set!")
+if not QDRANT_API_KEY:
+    print("WARNING: QDRANT_API_KEY not set!")
+
 # Embeddings
 embeddings = OpenAIEmbeddings(
-    openai_api_key=os.getenv("OPENAI_API_KEY"),
+    openai_api_key=OPENAI_API_KEY,
     openai_api_base="https://litellm.confer.today"
 )
 
 # LLM
 llm = ChatOpenAI(
     model="gpt-4.1-nano",
-    openai_api_key=os.getenv("OPENAI_API_KEY"),
+    openai_api_key=OPENAI_API_KEY,
     openai_api_base="https://litellm.confer.today"
 )
 
@@ -84,29 +94,51 @@ class QueryRequest(BaseModel):
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "openai_key_set": bool(OPENAI_API_KEY),
+        "qdrant_key_set": bool(QDRANT_API_KEY)
+    }
 
 
 @app.post("/query")
 def query_rag(request: QueryRequest):
-    # Get embedding for the query
-    vector = embeddings.embed_query(request.query)
+    try:
+        # Check API keys
+        if not OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+        if not QDRANT_API_KEY:
+            raise HTTPException(status_code=500, detail="QDRANT_API_KEY not configured")
+        
+        # Get embedding for the query
+        vector = embeddings.embed_query(request.query)
+        
+        # Search Qdrant
+        response = requests.post(
+            "https://qdrant.confersolutions.ai/collections/confer-website/points/search",
+            headers={"api-key": QDRANT_API_KEY},
+            json={"vector": vector, "limit": 5, "with_payload": True},
+            timeout=60
+        )
+        
+        # Check response
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Qdrant error: {response.status_code} - {response.text}")
+        
+        result = response.json()
+        
+        # Format context from retrieved documents
+        context = "\n\n".join([r["payload"].get("content", "") for r in result.get("result", [])])
+        
+        # Generate answer using LangChain
+        answer = chain.invoke({"context": context, "input": request.query})
+        
+        return {"answer": answer}
     
-    # Search Qdrant using requests (bypasses httpx timeout issue)
-    result = requests.post(
-        "https://qdrant.confersolutions.ai/collections/confer-website/points/search",
-        headers={"api-key": os.getenv("QDRANT_API_KEY")},
-        json={"vector": vector, "limit": 5, "with_payload": True},
-        timeout=60
-    ).json()
-    
-    # Format context from retrieved documents
-    context = "\n\n".join([r["payload"].get("content", "") for r in result.get("result", [])])
-    
-    # Generate answer using LangChain
-    answer = chain.invoke({"context": context, "input": request.query})
-    
-    return {"answer": answer}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
