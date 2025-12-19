@@ -1,33 +1,27 @@
-# Backend Dockerfile for RAG System
+
+# Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Prevent Python from writing pyc files and enable unbuffered mode
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set working directory
+# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first for better caching
+# Copy the requirements file into the container
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY rag_system.py .
+# Copy the rest of the application code
+COPY main.py .
 
-# Expose FastAPI port
+# Expose port 8000 for the FastAPI app
 EXPOSE 8000
 
-# Health check for Coolify
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+# Environment variables (set these in Coolify)
+# OPENAI_API_KEY - Your OpenAI API key
+# OPENAI_API_BASE - OpenAI API base URL (optional)
+# QDRANT_URL - Qdrant database URL
+# QDRANT_API_KEY - Qdrant API key
 
-# Run the FastAPI app
-CMD ["uvicorn", "rag_system:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application using uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
