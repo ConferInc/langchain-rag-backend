@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
-COPY rag_system.py .
+COPY main.py .
 
 # Expose port 8000 for the FastAPI app
 EXPOSE 8000
