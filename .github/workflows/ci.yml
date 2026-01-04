@@ -1,0 +1,40 @@
+name: CI – LangChain RAG Backend (Python)
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  validate:
+    name: Python Syntax & Import Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ✅ Syntax check only (no execution)
+      - name: Python syntax check
+        run: |
+          python -m py_compile main.py
+
+      # ✅ Import validation (safe, no server start)
+      - name: Import validation
+        env:
+          OPENAI_API_KEY: dummy
+        run: |
+          python - <<EOF
+          import main
+          print("Import validation passed")
+          EOF
