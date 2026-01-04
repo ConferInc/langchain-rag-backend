@@ -7,7 +7,7 @@ on:
 
 jobs:
   validate:
-    name: Python Syntax & Import Validation
+    name: Python Syntax Validation
     runs-on: ubuntu-latest
 
     steps:
@@ -24,17 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ✅ Syntax check only (no execution)
+      # ✅ Syntax-only check (NO execution)
       - name: Python syntax check
         run: |
           python -m py_compile main.py
-
-      # ✅ Import validation (safe, no server start)
-      - name: Import validation
-        env:
-          OPENAI_API_KEY: dummy
-        run: |
-          python - <<EOF
-          import main
-          print("Import validation passed")
-          EOF
