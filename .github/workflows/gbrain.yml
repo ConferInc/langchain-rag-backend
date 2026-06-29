@@ -1,0 +1,13 @@
+name: GBrain Sync
+on:
+  push:
+    branches: [main, master]
+jobs:
+  gbrain:
+    uses: ConferInc/.github/.github/workflows/confer-gbrain-sync.yml@main
+    with:
+      source: confer-code
+      client: "Confer"
+      project: "Shared Utilities/Tools"
+      repo_type: utility-rag
+    secrets: inherit
